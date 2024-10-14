@@ -1,0 +1,52 @@
+local player = game.Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local userInputService = game:GetService("UserInputService")
+local runService = game:GetService("RunService")
+local tiltEvent = game.ReplicatedStorage:WaitForChild("TiltEvent") -- Evento remoto
+
+-- Variables de configuración
+local tiltAmount = 15 -- Grados de inclinación
+local tiltSpeed = 0.1 -- Velocidad de inclinación
+local currentTilt = 0 -- Inclinación actual
+
+-- Obtener torso según el tipo de personaje (R6 o R15)
+local torso = character:WaitForChild("UpperTorso") or character:WaitForChild("Torso")
+
+-- Función para inclinar el torso
+local function tiltTorso(targetTilt)
+    local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+    
+    -- Tween para inclinar suavemente
+    local goalCFrame = humanoidRootPart.CFrame * CFrame.Angles(0, 0, math.rad(targetTilt))
+    humanoidRootPart.CFrame = goalCFrame
+end
+
+-- Función para manejar la inclinación al presionar teclas
+local function onInputBegan(input, gameProcessed)
+    if not gameProcessed then
+        if input.KeyCode == Enum.KeyCode.Q then
+            currentTilt = -tiltAmount -- Inclinación hacia la izquierda
+            tiltEvent:FireServer(currentTilt) -- Sincronizar inclinación con el servidor
+        elseif input.KeyCode == Enum.KeyCode.E then
+            currentTilt = tiltAmount -- Inclinación hacia la derecha
+            tiltEvent:FireServer(currentTilt) -- Sincronizar inclinación con el servidor
+        end
+    end
+end
+
+-- Función para manejar la liberación de teclas
+local function onInputEnded(input)
+    if input.KeyCode == Enum.KeyCode.Q or input.KeyCode == Enum.KeyCode.E then
+        currentTilt = 0 -- Restablece la inclinación
+        tiltEvent:FireServer(currentTilt) -- Sincronizar inclinación con el servidor
+    end
+end
+
+-- Conectar los eventos de entrada
+userInputService.InputBegan:Connect(onInputBegan)
+userInputService.InputEnded:Connect(onInputEnded)
+
+-- Conectar la función de actualización al evento RenderStepped
+runService.RenderStepped:Connect(function()
+    tiltTorso(currentTilt) -- Aplicar la inclinación al torso
+end)
