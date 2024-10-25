@@ -1,0 +1,76 @@
+local zombie = script.Parent -- El modelo del zombie
+local humanoid = zombie:WaitForChild("Humanoid")
+local pathfindingService = game:GetService("PathfindingService")
+local attackDistance = 3 -- Distancia para atacar al jugador
+local followDistance = 50 -- Distancia máxima para seguir al jugador
+local damage = 10 -- Cantidad de daño que el zombie inflige al atacar
+
+-- Función para encontrar al jugador más cercano
+local function findNearestPlayer()
+    local nearestPlayer = nil
+    local shortestDistance = math.huge
+
+    for _, player in pairs(game.Players:GetPlayers()) do
+        local character = player.Character
+        if character and character:FindFirstChild("HumanoidRootPart") and character:FindFirstChild("Humanoid").Health > 0 then
+            local distance = (zombie.HumanoidRootPart.Position - character.HumanoidRootPart.Position).Magnitude
+            if distance < shortestDistance then
+                shortestDistance = distance
+                nearestPlayer = character
+            end
+        end
+    end
+    return nearestPlayer
+end
+
+-- Función para que el zombie siga al jugador
+local function moveToPlayer(playerCharacter)
+    local targetPosition = playerCharacter:WaitForChild("HumanoidRootPart").Position
+    local path = pathfindingService:CreatePath({
+        AgentRadius = 2,
+        AgentHeight = 5,
+        AgentCanJump = true,
+        AgentJumpHeight = 10,
+        AgentMaxSlope = 45
+    })
+
+    path:ComputeAsync(zombie.HumanoidRootPart.Position, targetPosition)
+
+    if path.Status == Enum.PathStatus.Complete then
+        for _, waypoint in pairs(path:GetWaypoints()) do
+            humanoid:MoveTo(waypoint.Position)
+            humanoid.MoveToFinished:Wait()
+
+            -- Si el zombie está muy cerca del jugador, no necesita moverse más
+            if (zombie.HumanoidRootPart.Position - targetPosition).Magnitude <= attackDistance then
+                break
+            end
+        end
+    end
+end
+
+-- Función para que el zombie ataque al jugador
+local function attackPlayer(playerCharacter)
+    local humanoid = playerCharacter:FindFirstChild("Humanoid")
+    if humanoid and humanoid.Health > 0 then
+        humanoid:TakeDamage(damage) -- Aplica daño al jugador
+    end
+end
+
+-- Loop principal para que el zombie siga y ataque a los jugadores
+while true do
+    local nearestPlayer = findNearestPlayer()
+    if nearestPlayer then
+        -- Si el jugador está dentro de la distancia de seguimiento, el zombie lo sigue
+        local distanceToPlayer = (zombie.HumanoidRootPart.Position - nearestPlayer.HumanoidRootPart.Position).Magnitude
+        if distanceToPlayer <= followDistance then
+            moveToPlayer(nearestPlayer)
+
+            -- Si el zombie está lo suficientemente cerca, ataca
+            if distanceToPlayer <= attackDistance then
+                attackPlayer(nearestPlayer)
+            end
+        end
+    end
+    wait(0.5) -- Repite la búsqueda y el movimiento cada 0.5 segundos
+end
